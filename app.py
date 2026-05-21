@@ -12,7 +12,7 @@ from groq import Groq
 # GROQ CONFIG
 # =========================
 GROQ_API_KEY = st.secrets.get("GROQ_API_KEY", os.getenv("GROQ_API_KEY"))
-client_llm = Groq(api_key=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)
+client_llm = Groq(api_key=st.secrets["GROQ_API_KEY"])
 
 MODEL_NAME = "qwen-2.5-7b-instruct"  # hoặc llama-3.1-8b-instant
 
