@@ -11,7 +11,7 @@ from pyvi import ViTokenizer
 from datetime import datetime
 from groq import Groq
 import os
-
+import build_vectordb
 # =========================
 # GROQ CLIENT
 # =========================
