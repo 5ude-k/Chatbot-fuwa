@@ -8,7 +8,7 @@ from pyvi import ViTokenizer
 # =========================
 # CONFIG
 # =========================
-FILE_PATH = r"C:\Users\khoik\Downloads\New folder (4)\data\Fuwa3e_Danh_Sach_San_Pham.xlsx"
+FILE_PATH = "Fuwa3e_Danh_Sach_San_Pham.xlsx"
 
 embed_model = SentenceTransformer("BAAI/bge-m3")
 
