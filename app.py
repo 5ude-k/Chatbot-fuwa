@@ -107,7 +107,7 @@ def check_handbook(query):
 # =========================
 # HYBRID SEARCH
 # =========================
-def hybrid_search(query: str, top_k: int = 5):
+def hybrid_search(query: str, top_k: int = 10):
     try:
         tokens = ViTokenizer.tokenize(query.lower()).split()
         scores = bm25.get_scores(tokens)
