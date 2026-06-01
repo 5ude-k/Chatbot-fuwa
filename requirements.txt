@@ -1,5 +1,8 @@
 streamlit
+chromadb
 groq
-rank-bm25
+sentence-transformers
 pyvi
-numpy<2.0
+rank-bm25
+torch
+transformers
