@@ -114,7 +114,7 @@ def hybrid_search(query: str, top_k: int = 5):
         top_idx = scores.argsort()[-top_k:][::-1]
         
         results = []
-        for idx in top_idx:                    # ← Đã sửa thụt lề
+        for idx in top_idx:
             if idx >= len(documents):
                 continue
             if scores[idx] <= 0:
@@ -216,8 +216,8 @@ QUY TẮC:
 - Luôn trả lời bằng tiếng Việt
 - Xưng em, gọi khách là anh/chị
 - Chỉ nói về sản phẩm Fuwa3e
-- Không bịa thông tin, không suy đoán
-- Khi có sản phẩm: ghi tên, danh mục, giá, mô tả ngắn, link nếu có
+- Chỉ được dùng thông tin xuất hiện trong PRODUCT DATA
+- Không bịa thông tin, không suy đoán, không tự thêm giá hoặc link
 - Khi không có dữ liệu: "Fuwa3e hiện chưa có thông tin phù hợp anh/chị ạ."
 
 ================ CHAT HISTORY ================
@@ -239,6 +239,7 @@ Trả lời tự nhiên và hữu ích.
         with st.spinner("Em đang tìm sản phẩm phù hợp..."):
             placeholder = st.empty()
             full_response = ""
+            
             try:
                 stream = client_llm.chat.completions.create(
                     model="qwen/qwen3-32b",
@@ -247,13 +248,22 @@ Trả lời tự nhiên và hữu ích.
                     top_p=0.9,
                     stream=True
                 )
+                
                 for chunk in stream:
                     content = chunk.choices[0].delta.content or ""
                     full_response += content
                     placeholder.markdown(full_response + "▌")
                 
-                placeholder.markdown(full_response)
-                answer = re.sub(r"<think>.*?</think>", "", full_response, flags=re.DOTALL).strip()
+                # Xử lý sau khi stream xong
+                answer = re.sub(
+                    r"<think>.*?</think>",
+                    "",
+                    full_response,
+                    flags=re.DOTALL
+                ).strip()
+                
+                placeholder.markdown(answer)
+                
             except Exception as e:
                 print(e)
                 answer = """
