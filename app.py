@@ -3,15 +3,12 @@ import sys
 
 sys.modules["sqlite3"] = sys.modules.pop("pysqlite3")
 import streamlit as st
-import chromadb
 import pickle
 import json
-from sentence_transformers import SentenceTransformer
 from pyvi import ViTokenizer
 from datetime import datetime
 from groq import Groq
 import os
-import build_vectordb
 # =========================
 # GROQ CLIENT
 # =========================
@@ -67,21 +64,14 @@ HANDBOOK = HANDBOOK_RAW.get("faq", [])
 @st.cache_resource
 def load_resources():
 
-    embed_model = SentenceTransformer("BAAI/bge-m3")
-
-    client = chromadb.PersistentClient(path="./vectordb")
-
-    collection = client.get_collection("products")
-
     with open("bm25.pkl", "rb") as f:
         bm25_data = pickle.load(f)
 
     bm25, documents, metadatas = bm25_data[:3]
 
-    return embed_model, collection, bm25, documents, metadatas
+    return bm25, documents, metadatas
 
-embed_model, collection, bm25, documents, metadatas = load_resources()
-
+bm25, documents, metadatas = load_resources()
 # =========================
 # UI
 # =========================
@@ -153,99 +143,33 @@ def hybrid_search(query: str, top_k: int = 10):
 
     try:
 
-        # ===== BM25 =====
-
         tokens = ViTokenizer.tokenize(
             query.lower()
         ).split()
 
-        bm25_scores = bm25.get_scores(tokens)
+        scores = bm25.get_scores(tokens)
 
-        bm25_top_idx = bm25_scores.argsort()[-top_k*5:][::-1]
+        top_idx = scores.argsort()[-top_k:][::-1]
 
-        # ===== VECTOR SEARCH =====
+        results = []
 
-        emb = embed_model.encode(query).tolist()
+        for idx in top_idx:
 
-        vec_res = collection.query(
-            query_embeddings=[emb],
-            n_results=top_k*5,
-            include=[
-                "documents",
-                "metadatas",
-                "distances"
-            ]
-        )
-
-        score_dict = {}
-
-        doc_dict = {}
-
-        # ===== VECTOR SCORE =====
-
-        for rank, (doc, meta, dist) in enumerate(
-            zip(
-                vec_res["documents"][0],
-                vec_res["metadatas"][0],
-                vec_res["distances"][0]
-            )
-        ):
-
-            name = meta.get("ten_san_pham", "")
-
-            if name:
-
-                score_dict[name] = (
-                    score_dict.get(name, 0)
-                    + 1.0 / (rank + 50)
-                )
-
-                doc_dict[name] = (doc, meta)
-
-        # ===== BM25 SCORE =====
-
-        for rank, idx in enumerate(bm25_top_idx):
-
-            if idx >= len(metadatas):
+            if idx >= len(documents):
                 continue
 
-            meta = metadatas[idx]
-
-            name = meta.get("ten_san_pham", "")
-
-            if name:
-
-                score_dict[name] = (
-                    score_dict.get(name, 0)
-                    + 1.0 / (rank + 50)
+            results.append(
+                (
+                    documents[idx],
+                    metadatas[idx]
                 )
-
-                if name not in doc_dict:
-
-                    doc_dict[name] = (
-                        documents[idx],
-                        meta
-                    )
-
-        # ===== SORT =====
-
-        top_items = sorted(
-            score_dict.items(),
-            key=lambda x: x[1],
-            reverse=True
-        )[:top_k]
-
-        return [
-            (
-                doc_dict[name][0],
-                doc_dict[name][1]
             )
-            for name, _ in top_items
-        ]
+
+        return results
 
     except Exception as e:
 
-        print("HYBRID SEARCH ERROR:", e)
+        print("BM25 ERROR:", e)
 
         return []
 
