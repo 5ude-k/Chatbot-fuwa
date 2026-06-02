@@ -1,8 +1,7 @@
 streamlit
-chromadb
 groq
 sentence-transformers
 pyvi
-rank-bm25
-torch
-transformers
+chromadb==0.5.5
+protobuf==4.25.3
+google-protobuf==4.25.3
