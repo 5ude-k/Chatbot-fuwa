@@ -2,6 +2,5 @@ streamlit
 groq
 sentence-transformers
 pyvi
-chromadb==0.5.5
-protobuf==4.25.3
-google-protobuf==4.25.3
+chromadb
+protobuf
