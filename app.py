@@ -7,6 +7,7 @@ from pyvi import ViTokenizer
 from datetime import datetime
 from groq import Groq
 import chromadb
+import re
 
 # =========================
 # GROQ CLIENT
@@ -17,7 +18,6 @@ client_llm = Groq(api_key=os.getenv("GROQ_API_KEY"))
 # LOGGING SETUP
 # =========================
 LOG_FILE = "chat_log.txt"
-
 def write_log(role: str, content: str):
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     try:
@@ -45,25 +45,22 @@ HANDBOOK = HANDBOOK_RAW.get("faq", [])
 @st.cache_resource
 def load_resources():
     embed_model = SentenceTransformer("BAAI/bge-m3")
-    
-    # In-Memory ChromaDB (không dùng persistent để tránh lỗi Streamlit Cloud)
+   
     client = chromadb.Client()
     collection = client.get_or_create_collection("fuwa3e_products")
-    
-    # Load BM25
+   
     with open("bm25.pkl", "rb") as f:
         bm25_data = pickle.load(f)
     bm25, documents, metadatas = bm25_data[:3]
-    
-    # Nạp dữ liệu vào ChromaDB nếu chưa có
+   
     if collection.count() == 0 and len(documents) > 0:
-            for i, (doc, meta) in enumerate(zip(documents, metadatas)):
-                collection.add(
-                    documents=[doc],
-                    metadatas=[meta],
-                    ids=[f"doc_{i}"]
-                )
-    
+        for i, (doc, meta) in enumerate(zip(documents, metadatas)):
+            collection.add(
+                documents=[doc],
+                metadatas=[meta],
+                ids=[f"doc_{i}"]
+            )
+   
     return embed_model, collection, bm25, documents, metadatas
 
 embed_model, collection, bm25, documents, metadatas = load_resources()
@@ -81,35 +78,30 @@ def check_handbook(query):
             return item.get("answer")
     return None
 
-
 def hybrid_search(query: str, top_k: int = 10):
     try:
-        # Vector Search (Chroma)
         query_emb = embed_model.encode(query).tolist()
         vec_results = collection.query(
             query_embeddings=[query_emb],
             n_results=top_k * 5,
             include=["documents", "metadatas", "distances"]
         )
-        
-        # BM25 Search
+       
         tokens = ViTokenizer.tokenize(query.lower()).split()
         bm25_scores = bm25.get_scores(tokens)
         bm25_top_idx = bm25_scores.argsort()[-top_k*5:][::-1]
-        
+       
         score_dict = {}
         doc_dict = {}
-        
-        # Kết quả từ Chroma
-        for doc, meta, dist in zip(vec_results["documents"][0], 
-                                  vec_results["metadatas"][0], 
+       
+        for doc, meta, dist in zip(vec_results["documents"][0],
+                                  vec_results["metadatas"][0],
                                   vec_results["distances"][0]):
             name = meta.get("ten_san_pham", "")
             if name:
                 score_dict[name] = score_dict.get(name, 0) + (1 - dist)
                 doc_dict[name] = (doc, meta)
-        
-        # Kết quả từ BM25
+       
         for rank, idx in enumerate(bm25_top_idx):
             if idx >= len(metadatas):
                 continue
@@ -118,15 +110,13 @@ def hybrid_search(query: str, top_k: int = 10):
             if name and name not in doc_dict:
                 score_dict[name] = score_dict.get(name, 0) + 1.0 / (rank + 30)
                 doc_dict[name] = (documents[idx], meta)
-        
-        # Lấy top kết quả
+       
         top_items = sorted(score_dict.items(), key=lambda x: x[1], reverse=True)[:top_k]
         return [(doc_dict[name][0], doc_dict[name][1]) for name, _ in top_items]
-    
+   
     except Exception as e:
         print("Hybrid Search Error:", e)
         return []
-
 
 # =========================
 # UI
@@ -155,9 +145,9 @@ if prompt := st.chat_input("Nhập câu hỏi của anh/chị..."):
         st.warning("Vui lòng nhập câu hỏi ạ!")
         st.stop()
 
-    # Save user message
     write_log("user", prompt)
     st.session_state.messages.append({"role": "user", "content": prompt})
+    
     with st.chat_message("user"):
         st.markdown(prompt)
 
@@ -172,7 +162,7 @@ if prompt := st.chat_input("Nhập câu hỏi của anh/chị..."):
 
     # Hybrid Search
     results = hybrid_search(prompt)
-    
+   
     context_parts = []
     for doc, meta in results:
         context_parts.append(f"""
@@ -182,13 +172,14 @@ Giá: {meta.get('gia')}
 Link: {meta.get('link', 'Không có')}
 Mô tả: {doc[:750]}...
 """)
-
+    
     context = "\n---\n".join(context_parts) if context_parts else "Không tìm thấy sản phẩm phù hợp."
-    history = "\n".join([f"{m['role']}: {m['content']}" for m in st.session_state.messages[-6:]])
-
+    
+    # Lấy lịch sử chat (không lấy tin nhắn cuối cùng để tránh lặp)
+    history = "\n".join([f"{m['role']}: {m['content']}" for m in st.session_state.messages[-7:-1]])
+    
     # Final Prompt
     final_prompt = f"""Bạn là Fuwa3e Assistant - trợ lý bán hàng dễ thương và chuyên nghiệp.
-
 **Quy tắc quan trọng:**
 - Luôn xưng "em", gọi khách là "anh/chị"
 - Chỉ trả lời về sản phẩm Fuwa3e
@@ -204,13 +195,13 @@ DỮ LIỆU SẢN PHẨM:
 Câu hỏi của anh/chị: {prompt}
 
 Hãy trả lời tự nhiên, hữu ích và gần gũi."""
-
+    
     # Generate Response
     with st.chat_message("assistant"):
         with st.spinner("Em đang tìm sản phẩm phù hợp..."):
             placeholder = st.empty()
             full_response = ""
-            
+
             try:
                 stream = client_llm.chat.completions.create(
                     model="qwen/qwen3-32b",
@@ -219,25 +210,26 @@ Hãy trả lời tự nhiên, hữu ích và gần gũi."""
                     top_p=0.9,
                     stream=True
                 )
-                
+               
                 for chunk in stream:
                     content = chunk.choices[0].delta.content or ""
                     full_response += content
                     placeholder.markdown(full_response + "▌")
+               
+                # Xóa <think> và lưu kết quả
+                answer = re.sub(
+                    r"<think>.*?</think>",
+                    "",
+                    full_response,
+                    flags=re.DOTALL
+                ).strip()
                 
-                placeholder.markdown(full_response)
-                answer = full_response
-                
+                placeholder.markdown(answer)
+               
             except Exception as e:
                 answer = "Em xin lỗi anh/chị 💕 Hiện hệ thống đang gặp lỗi nhỏ. Anh/chị thử lại sau giúp em nhé."
                 placeholder.markdown(answer)
-            import re
+                print("LLM Error:", e)
 
-answer = re.sub(
-    r"<think>.*?</think>",
-    "",
-    full_response,
-    flags=re.DOTALL
-).strip()
             write_log("assistant", answer)
             st.session_state.messages.append({"role": "assistant", "content": answer})
