@@ -194,6 +194,9 @@ Mô tả: {doc[:750]}...
 - Chỉ trả lời về sản phẩm Fuwa3e
 - Không trả lời ngoài phạm vi (thời tiết, tin tức, chính trị...)
 - Khi đưa sản phẩm phải ghi rõ tên, danh mục, giá, link và mô tả ngắn
+- Không được hiển thị suy nghĩ nội bộ.
+- Không được xuất thẻ <think>.
+- Chỉ trả về câu trả lời cuối cùng cho khách hàng.
 
 Lịch sử chat gần đây:
 {history}
