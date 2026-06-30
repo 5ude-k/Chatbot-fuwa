@@ -194,9 +194,6 @@ Mô tả: {doc[:750]}...
 - Chỉ trả lời về sản phẩm Fuwa3e
 - Không trả lời ngoài phạm vi (thời tiết, tin tức, chính trị...)
 - Khi đưa sản phẩm phải ghi rõ tên, danh mục, giá, link và mô tả ngắn
-- Không được hiển thị suy nghĩ nội bộ.
-- Không được xuất thẻ <think>.
-- Chỉ trả về câu trả lời cuối cùng cho khách hàng.
 
 Lịch sử chat gần đây:
 {history}
@@ -234,6 +231,13 @@ Hãy trả lời tự nhiên, hữu ích và gần gũi."""
             except Exception as e:
                 answer = "Em xin lỗi anh/chị 💕 Hiện hệ thống đang gặp lỗi nhỏ. Anh/chị thử lại sau giúp em nhé."
                 placeholder.markdown(answer)
+            import re
 
+answer = re.sub(
+    r"<think>.*?</think>",
+    "",
+    full_response,
+    flags=re.DOTALL
+).strip()
             write_log("assistant", answer)
             st.session_state.messages.append({"role": "assistant", "content": answer})
