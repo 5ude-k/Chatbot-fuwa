@@ -57,7 +57,6 @@ def load_resources():
     
     # Nạp dữ liệu vào ChromaDB nếu chưa có
     if collection.count() == 0 and len(documents) > 0:
-        with st.spinner("Đang nạp dữ liệu sản phẩm lần đầu tiên..."):
             for i, (doc, meta) in enumerate(zip(documents, metadatas)):
                 collection.add(
                     documents=[doc],
