@@ -4,3 +4,4 @@ sentence-transformers
 pyvi
 chromadb
 protobuf
+rank-bm25
